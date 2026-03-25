@@ -71,8 +71,8 @@ function FlairsPage() {
                       .slice()
                       .sort(
                         (a, b) =>
-                          new Date(b.startedAt).getTime() -
-                          new Date(a.startedAt).getTime(),
+                          parseBackendDate(b.startedAt).getTime() -
+                          parseBackendDate(a.startedAt).getTime(),
                       )
                       .map((flair) => (
                         <tr
@@ -126,8 +126,8 @@ function FlairsPage() {
                   .slice()
                   .sort(
                     (a, b) =>
-                      new Date(b.startedAt).getTime() -
-                      new Date(a.startedAt).getTime(),
+                      parseBackendDate(b.startedAt).getTime() -
+                      parseBackendDate(a.startedAt).getTime(),
                   )
                   .map((flair) => (
                     <Link
@@ -191,11 +191,15 @@ function FlairsListSkeleton() {
 
 function formatDate(dateStr: string) {
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: "Africa/Lagos",
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  }).format(new Date(dateStr));
+  }).format(parseBackendDate(dateStr));
+}
+
+function parseBackendDate(dateStr: string) {
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(dateStr);
+  return new Date(hasTimezone ? dateStr : `${dateStr}Z`);
 }

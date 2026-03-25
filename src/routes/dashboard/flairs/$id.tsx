@@ -128,8 +128,8 @@ function FlairDetailPage() {
                     .slice()
                     .sort(
                       (a, b) =>
-                        new Date(b.createdAt).getTime() -
-                        new Date(a.createdAt).getTime(),
+                        parseBackendDate(b.createdAt).getTime() -
+                        parseBackendDate(a.createdAt).getTime(),
                     )
                     .map((log) => (
                       <div
@@ -235,17 +235,16 @@ function FlairDetailSkeleton() {
 
 function formatDate(dateStr: string) {
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: "Africa/Lagos",
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  }).format(new Date(dateStr));
+  }).format(parseBackendDate(dateStr));
 }
 
 function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
+  const diff = Date.now() - parseBackendDate(dateStr).getTime();
   const secs = Math.floor(diff / 1000);
   if (secs < 60) return `${secs}s ago`;
   const mins = Math.floor(diff / 60000);
@@ -253,6 +252,11 @@ function timeAgo(dateStr: string) {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function parseBackendDate(dateStr: string) {
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(dateStr);
+  return new Date(hasTimezone ? dateStr : `${dateStr}Z`);
 }
 
 function formatLogType(type: string) {

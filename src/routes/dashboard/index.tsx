@@ -468,10 +468,16 @@ function OverviewCard({
 }
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleString("en-US", {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  });
+    hour12: false,
+  }).format(parseBackendDate(dateStr));
+}
+
+function parseBackendDate(dateStr: string) {
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(dateStr);
+  return new Date(hasTimezone ? dateStr : `${dateStr}Z`);
 }

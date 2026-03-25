@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AppLayout } from "#/components/layout/app-layout";
 import { Skeleton } from "#/components/shared/skeleton";
@@ -11,6 +11,7 @@ export const Route = createFileRoute("/dashboard/pulses/")({
 });
 
 function PulsesPage() {
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
   const [perPage, setPerPage] = useState(10);
@@ -45,6 +46,23 @@ function PulsesPage() {
   const pulses: Pulse[] = data?.pulses ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
+
+  const pauseResumePulse = useMutation({
+    mutationFn: async ({
+      id,
+      action,
+    }: {
+      id: string;
+      action: "pause" | "resume";
+    }) => {
+      const res = await api.patch(`/pulse/${id}/${action}`);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["pulses"] });
+      await queryClient.invalidateQueries({ queryKey: ["pulse"] });
+    },
+  });
 
   return (
     <AppLayout>
@@ -145,14 +163,22 @@ function PulsesPage() {
             </div>
           ) : (
             <div className="divide-y divide-[#1a1a1a]">
-              {pulses.map((pulse) => (
-                <Link
-                  key={pulse.id}
-                  to="/dashboard/$id"
-                  params={{ id: pulse.id }}
-                  className="block px-4 py-4 transition-colors hover:bg-[#141414] sm:px-6"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              {pulses.map((pulse) => {
+                const isMutatingPulse =
+                  pauseResumePulse.isPending &&
+                  pauseResumePulse.variables?.id === pulse.id;
+
+                return (
+                  <div
+                    key={pulse.id}
+                    className="px-4 py-4 transition-colors hover:bg-[#141414] sm:px-6"
+                  >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <Link
+                        to="/dashboard/$id"
+                        params={{ id: pulse.id }}
+                        className="min-w-0 flex-1"
+                      >
                     <div className="min-w-0">
                       <p className="truncate text-[13px] font-medium text-[#f5f5f5]">
                         {pulse.name || "Untitled pulse"}
@@ -161,33 +187,54 @@ function PulsesPage() {
                         {pulse.url}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="border border-[#1f1f1f] px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-[#555]">
-                        {pulse.method}
-                      </span>
-                      <span className="border border-[#1f1f1f] px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-[#555]">
-                        {pulse.interval}s
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1.5 border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider ${
-                          pulse.isActive
-                            ? "border-green-500/20 bg-green-500/5 text-green-500"
-                            : "border-[#1f1f1f] text-[#444]"
-                        }`}
-                      >
+                      </Link>
+                      <div className="flex flex-wrap gap-2 lg:justify-end">
+                        <span className="border border-[#1f1f1f] px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-[#555]">
+                          {pulse.method}
+                        </span>
+                        <span className="border border-[#1f1f1f] px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-[#555]">
+                          {pulse.interval}s
+                        </span>
                         <span
-                          className={`h-1.5 w-1.5 rounded-full ${
+                          className={`inline-flex items-center gap-1.5 border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider ${
                             pulse.isActive
-                              ? "bg-green-500 animate-pulse"
-                              : "bg-[#333]"
+                              ? "border-green-500/20 bg-green-500/5 text-green-500"
+                              : "border-[#1f1f1f] text-[#444]"
                           }`}
-                        />
-                        {pulse.isActive ? "Active" : "Paused"}
-                      </span>
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              pulse.isActive
+                                ? "bg-green-500 animate-pulse"
+                                : "bg-[#333]"
+                            }`}
+                          />
+                          {pulse.isActive ? "Active" : "Paused"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            pauseResumePulse.mutate({
+                              id: pulse.id,
+                              action: pulse.isActive ? "pause" : "resume",
+                            })
+                          }
+                          disabled={isMutatingPulse}
+                          className="cursor-pointer border border-[#1f1f1f] px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-[#666] transition-colors hover:border-[#fb923c] hover:text-[#fb923c] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isMutatingPulse
+                            ? pulse.isActive
+                              ? "Pausing..."
+                              : "Resuming..."
+                            : pulse.isActive
+                              ? "Pause"
+                              : "Resume"}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

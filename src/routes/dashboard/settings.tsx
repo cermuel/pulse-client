@@ -1,13 +1,67 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "#/components/layout/app-layout";
 import { useUser } from "#/context/useUser";
+import api from "#/lib/api";
 
 export const Route = createFileRoute("/dashboard/settings")({
   component: SettingsPage,
 });
 
 function SettingsPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: user } = useUser();
+  const [name, setName] = useState("");
+  const [deleteValue, setDeleteValue] = useState("");
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    setName(user.name || "");
+  }, [user]);
+
+  const deleteTarget = useMemo(
+    () => user?.email || user?.name || "your account",
+    [user],
+  );
+
+  const canDelete =
+    deleteValue.trim().toLowerCase() === deleteTarget.trim().toLowerCase();
+
+  const editUser = useMutation({
+    mutationFn: async () => {
+      const res = await api.patch("/user", {
+        name: name.trim() || undefined,
+      });
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["user"] });
+    },
+  });
+
+  const deleteUser = useMutation({
+    mutationFn: async () => {
+      const res = await api.delete("/user");
+      return res.data;
+    },
+    onSuccess: async () => {
+      queryClient.removeQueries({ queryKey: ["user"] });
+      queryClient.removeQueries({ queryKey: ["pulses"] });
+      queryClient.removeQueries({ queryKey: ["pulse"] });
+      queryClient.removeQueries({ queryKey: ["flairs"] });
+
+      try {
+        await api.post("/auth/logout");
+      } catch {
+        // Account may already be gone; continue out of the dashboard either way.
+      }
+
+      navigate({ to: "/" });
+    },
+  });
 
   return (
     <AppLayout>
@@ -18,8 +72,8 @@ function SettingsPage() {
           </p>
 
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#7a7a7a]">
-            Review your account details, default workspace preferences, and
-            high-impact actions for this account.
+            Update your account profile and handle the high-impact actions for
+            this workspace.
           </p>
         </div>
 
@@ -32,49 +86,63 @@ function SettingsPage() {
                 </p>
               </div>
 
-              <div className="divide-y divide-[#1a1a1a]">
-                <SettingsRow
-                  label="Name"
-                  value={user?.name || "Unnamed user"}
-                  description="The display name attached to your account."
-                />
-                <SettingsRow
+              <form
+                className="space-y-5 px-4 py-5 sm:px-6"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  editUser.mutate();
+                }}
+              >
+                <Field label="Display name" description="The name shown across your workspace.">
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Your name"
+                    className="w-full border border-[#1f1f1f] bg-[#111] px-4 py-3 font-mono text-[12px] text-[#f5f5f5] placeholder-[#333] outline-none transition-colors focus:border-[#fb923c]"
+                  />
+                </Field>
+
+                <Field
                   label="Email"
-                  value={user?.email || "—"}
-                  description="Primary email used for login and notifications."
-                />
-                <SettingsRow
+                  description="Primary email attached to your OAuth account."
+                >
+                  <div className="w-full border border-[#1f1f1f] bg-[#0f0f0f] px-4 py-3 font-mono text-[12px] text-[#777]">
+                    {user?.email || "—"}
+                  </div>
+                </Field>
+
+                <Field
                   label="Provider"
-                  value={user?.provider || "github"}
                   description="OAuth provider currently connected to this account."
-                />
-              </div>
-            </div>
+                >
+                  <div className="w-full border border-[#1f1f1f] bg-[#0f0f0f] px-4 py-3 font-mono text-[12px] uppercase tracking-widest text-[#777]">
+                    {user?.provider || "github"}
+                  </div>
+                </Field>
 
-            <div className="mt-8 border border-[#1f1f1f] bg-[#111]">
-              <div className="border-b border-[#1f1f1f] px-4 py-4 sm:px-6">
-                <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-[#666]">
-                  Preferences
-                </p>
-              </div>
+                {editUser.isSuccess ? (
+                  <p className="font-mono text-[11px] text-green-500">
+                    Profile saved successfully.
+                  </p>
+                ) : null}
 
-              <div className="divide-y divide-[#1a1a1a]">
-                <ToggleRow
-                  title="Email alerts"
-                  description="Receive incident and recovery notifications in your inbox."
-                  enabled
-                />
-                <ToggleRow
-                  title="Status summaries"
-                  description="Get periodic summaries about monitor health and incident activity."
-                  enabled={false}
-                />
-                <ToggleRow
-                  title="Product updates"
-                  description="Receive occasional updates about new monitoring features."
-                  enabled={false}
-                />
-              </div>
+                {editUser.error ? (
+                  <p className="font-mono text-[11px] text-red-400">
+                    {extractError(editUser.error, "Couldn't update your profile.")}
+                  </p>
+                ) : null}
+
+                <div className="flex flex-col gap-3 pt-1 sm:flex-row">
+                  <button
+                    type="submit"
+                    disabled={editUser.isPending}
+                    className="inline-flex cursor-pointer items-center justify-center bg-[#fb923c] px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-[#0e0e0e] transition-colors hover:bg-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {editUser.isPending ? "Saving..." : "Save changes"}
+                  </button>
+                </div>
+              </form>
             </div>
 
             <div className="mt-8 border border-red-500/15 bg-[#111]">
@@ -87,7 +155,7 @@ function SettingsPage() {
               <div className="flex flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                 <div>
                   <p className="text-sm font-medium text-[#f5f5f5]">
-                    Delete workspace data
+                    Delete account
                   </p>
                   <p className="mt-2 text-sm leading-6 text-[#777]">
                     Permanently remove your account, pulses, flairs, and stored
@@ -96,6 +164,10 @@ function SettingsPage() {
                 </div>
                 <button
                   type="button"
+                  onClick={() => {
+                    setDeleteValue("");
+                    setIsDeleteOpen(true);
+                  }}
                   className="inline-flex cursor-pointer items-center justify-center border border-red-500/25 bg-red-500/5 px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-red-400 transition-colors hover:border-red-500/40 hover:bg-red-500/10"
                 >
                   Delete account
@@ -130,80 +202,152 @@ function SettingsPage() {
 
             <div className="mt-4 border border-[#1f1f1f] bg-[#111] px-4 py-5 sm:px-6">
               <p className="text-sm font-semibold text-[#f5f5f5]">
-                Quick actions
+                Workspace summary
               </p>
-              <div className="mt-5 space-y-3">
-                <button
-                  type="button"
-                  className="inline-flex w-full cursor-pointer items-center justify-center border border-[#1f1f1f] px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-[#555] transition-colors hover:border-[#fb923c] hover:text-[#fb923c]"
-                >
-                  Manage notifications
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex w-full cursor-pointer items-center justify-center border border-[#1f1f1f] px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-[#555] transition-colors hover:border-[#fb923c] hover:text-[#fb923c]"
-                >
-                  Export account data
-                </button>
+              <div className="mt-5 space-y-4">
+                <SummaryItem label="Email" value={user?.email || "—"} />
+                <SummaryItem label="Provider" value={user?.provider || "github"} />
+                <SummaryItem
+                  label="Member since"
+                  value={formatDate(user?.createdAt)}
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {isDeleteOpen ? (
+        <DeleteAccountModal
+          target={deleteTarget}
+          confirmationValue={deleteValue}
+          onConfirmationChange={setDeleteValue}
+          onClose={() => setIsDeleteOpen(false)}
+          onDelete={() => deleteUser.mutate()}
+          canDelete={canDelete}
+          isDeleting={deleteUser.isPending}
+          errorMessage={extractError(deleteUser.error)}
+        />
+      ) : null}
     </AppLayout>
   );
 }
 
-function SettingsRow({
+function Field({
   label,
-  value,
   description,
+  children,
 }: {
   label: string;
-  value: string;
   description: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-[#f5f5f5]">{label}</p>
-        <p className="mt-1 text-sm text-[#666]">{description}</p>
-      </div>
-      <p className="break-words font-mono text-[11px] uppercase tracking-widest text-[#fb923c]">
-        {value}
-      </p>
+    <div>
+      <p className="text-sm font-medium text-[#f5f5f5]">{label}</p>
+      <p className="mt-1 text-sm text-[#666]">{description}</p>
+      <div className="mt-3">{children}</div>
     </div>
   );
 }
 
-function ToggleRow({
-  title,
-  description,
-  enabled,
-}: {
-  title: string;
-  description: string;
-  enabled: boolean;
-}) {
+function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 px-4 py-4 sm:px-6">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-[#f5f5f5]">{title}</p>
-        <p className="mt-1 text-sm leading-6 text-[#666]">{description}</p>
-      </div>
-      <button
-        type="button"
-        className={`relative mt-1 inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-          enabled ? "bg-[#fb923c]" : "bg-[#1f1f1f]"
-        }`}
-        aria-pressed={enabled}
-      >
-        <span
-          className={`absolute top-1 h-4 w-4 rounded-full bg-[#0e0e0e] transition-all ${
-            enabled ? "left-6" : "left-1"
-          }`}
-        />
-      </button>
+    <div>
+      <p className="font-mono text-[10px] uppercase tracking-widest text-[#444]">
+        {label}
+      </p>
+      <p className="mt-2 break-words text-sm text-[#f5f5f5]">{value}</p>
     </div>
   );
+}
+
+function DeleteAccountModal({
+  target,
+  confirmationValue,
+  onConfirmationChange,
+  canDelete,
+  isDeleting,
+  errorMessage,
+  onClose,
+  onDelete,
+}: {
+  target: string;
+  confirmationValue: string;
+  onConfirmationChange: (value: string) => void;
+  canDelete: boolean;
+  isDeleting: boolean;
+  errorMessage?: string;
+  onClose: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="w-full max-w-md border border-[rgba(245,245,245,0.08)] bg-[#111] p-5 sm:p-6">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#fb923c]">
+          Delete account
+        </p>
+        <h2 className="mt-4 text-2xl font-semibold text-[#f5f5f5]">
+          This action is permanent
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-[#7a7a7a]">
+          Type <span className="text-[#f5f5f5]">{target}</span> to confirm
+          account deletion.
+        </p>
+
+        <input
+          type="text"
+          value={confirmationValue}
+          onChange={(event) => onConfirmationChange(event.target.value)}
+          placeholder={target}
+          className="mt-6 w-full border border-[rgba(245,245,245,0.14)] bg-[#161616] px-4 py-3 font-mono text-[12px] text-[#f5f5f5] outline-none transition-colors focus:border-[#fb923c]"
+        />
+
+        {errorMessage ? (
+          <p className="mt-3 text-sm text-red-400">{errorMessage}</p>
+        ) : null}
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex cursor-pointer items-center justify-center border border-[rgba(245,245,245,0.14)] px-4 py-3 font-mono text-[11px] uppercase tracking-[0.18em] text-[#f5f5f5] transition-colors hover:border-[#fb923c] hover:text-[#fb923c]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={!canDelete || isDeleting}
+            className="inline-flex cursor-pointer items-center justify-center border border-red-500/30 bg-red-500/10 px-4 py-3 font-mono text-[11px] uppercase tracking-[0.18em] text-red-400 transition-colors hover:border-red-500/50 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isDeleting ? "Deleting..." : "Delete account"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function extractError(error: unknown, fallback = "Something went wrong.") {
+  const message =
+    (error as any)?.response?.data?.message ?? (error as any)?.message;
+
+  if (Array.isArray(message)) return message.join(", ");
+  if (typeof message === "string") return message;
+  return fallback;
+}
+
+function formatDate(dateStr?: string) {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }

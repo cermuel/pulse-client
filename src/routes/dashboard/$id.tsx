@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useUser } from "#/context/useUser";
 import api from "../../lib/api";
 import { AppLayout } from "#/components/layout/app-layout";
+import { ResponseTimeChart } from "#/components/shared/response-time-chart";
 import { Skeleton } from "#/components/shared/skeleton";
 
 export const Route = createFileRoute("/dashboard/$id")({
@@ -13,6 +14,10 @@ export const Route = createFileRoute("/dashboard/$id")({
 type Ping = {
   isUp: boolean;
   createdAt?: string;
+};
+
+type ResponseTimePoint = {
+  responseTime: number;
 };
 
 type Flair = {
@@ -63,7 +68,17 @@ function RouteComponent() {
     },
   });
 
+  const { data: responseTimesData, isLoading: isResponseTimesLoading } = useQuery({
+    queryKey: ["pulse", id, "response-times"],
+    queryFn: async () => {
+      const res = await api.get(`/ping/${id}`);
+      return res.data.times as ResponseTimePoint[];
+    },
+    enabled: Boolean(id),
+  });
+
   const pulse = data;
+  const responseTimes = responseTimesData ?? [];
 
   useEffect(() => {
     if (!pulse) return;
@@ -140,6 +155,17 @@ function RouteComponent() {
     },
   });
 
+  const pauseResumePulse = useMutation({
+    mutationFn: async (action: "pause" | "resume") => {
+      const res = await api.patch(`/pulse/${id}/${action}`);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["pulse", id] });
+      await queryClient.invalidateQueries({ queryKey: ["pulses"] });
+    },
+  });
+
   const uptime =
     pulse && pulse.pings.length > 0
       ? Math.round(
@@ -159,7 +185,7 @@ function RouteComponent() {
     : "Waiting";
   const nextCheckLabel = pulse?.lastCheckedAt
     ? timeUntil(
-        new Date(pulse.lastCheckedAt).getTime() + pulse.interval * 1000,
+        parseBackendDate(pulse.lastCheckedAt).getTime() + pulse.interval * 1000,
         now,
       )
     : `${pulse?.interval ?? 0}s cadence`;
@@ -212,6 +238,22 @@ function RouteComponent() {
                 >
                   {pulse.isActive ? "Active" : "Paused"}
                 </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    pauseResumePulse.mutate(pulse.isActive ? "pause" : "resume")
+                  }
+                  disabled={pauseResumePulse.isPending}
+                  className="cursor-pointer border border-[#1f1f1f] px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-[#666] transition-colors hover:border-[#fb923c] hover:text-[#fb923c] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {pauseResumePulse.isPending
+                    ? pulse.isActive
+                      ? "Pausing..."
+                      : "Resuming..."
+                    : pulse.isActive
+                      ? "Pause"
+                      : "Resume"}
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -321,6 +363,51 @@ function RouteComponent() {
                       })}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {responseTimes.length > 0 && (
+              <div className="mb-8 overflow-hidden border border-[#1f1f1f] bg-[#111]">
+                <div className="flex flex-col gap-4 border-b border-[#1f1f1f] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                  <div>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-[#666]">
+                      RESPONSE TIMES
+                    </p>
+                    <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-[#444]">
+                      Live monitor latency trend
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 sm:min-w-70">
+                    <MiniStat
+                      label="Latest"
+                      value={`${responseTimes.at(-1)?.responseTime ?? 0}ms`}
+                      tone="orange"
+                    />
+                    <MiniStat
+                      label="Average"
+                      value={`${Math.round(
+                        responseTimes.reduce(
+                          (sum, point) => sum + point.responseTime,
+                          0,
+                        ) / responseTimes.length,
+                      )}ms`}
+                    />
+                    <MiniStat
+                      label="Peak"
+                      value={`${Math.max(
+                        ...responseTimes.map((point) => point.responseTime),
+                      )}ms`}
+                      tone="red"
+                    />
+                  </div>
+                </div>
+
+                <div className="px-4 py-5 sm:px-6">
+                  <ResponseTimeChart
+                    values={responseTimes.slice(-40).map((point) => point.responseTime)}
+                    loading={isResponseTimesLoading}
+                  />
                 </div>
               </div>
             )}
@@ -498,11 +585,13 @@ function MiniStat({
 }: {
   label: string;
   value: string | number;
-  tone?: "green" | "red";
+  tone?: "green" | "red" | "orange";
 }) {
   const toneClass =
     tone === "green"
       ? "text-green-500"
+      : tone === "orange"
+      ? "text-[#fb923c]"
       : tone === "red"
         ? "text-red-400"
         : "text-[#f5f5f5]";
@@ -542,7 +631,7 @@ function PulseDetailSkeleton() {
 }
 
 function timeAgo(dateStr: string, now = Date.now()) {
-  const diff = now - new Date(dateStr).getTime();
+  const diff = now - parseBackendDate(dateStr).getTime();
   const secs = Math.floor(diff / 1000);
   if (secs < 1) return "0s ago";
   if (secs < 60) return `${secs}s ago`;
@@ -572,12 +661,18 @@ function formatInterval(seconds: number) {
 }
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleString("en-US", {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  });
+    hour12: false,
+  }).format(parseBackendDate(dateStr));
+}
+
+function parseBackendDate(dateStr: string) {
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(dateStr);
+  return new Date(hasTimezone ? dateStr : `${dateStr}Z`);
 }
 
 function DeletePulseModal({
