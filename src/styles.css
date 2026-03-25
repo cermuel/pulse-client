@@ -1,0 +1,116 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-sans: "Syne", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root {
+  --pulse-orange: #fb923c;
+  --pulse-orange-dim: #7c3b13;
+  --pulse-black: #0a0a0a;
+  --pulse-black-2: #111111;
+  --pulse-black-3: #1a1a1a;
+  --pulse-white: #f5f5f5;
+  --pulse-white-2: #e8e8e8;
+  --pulse-muted: #555555;
+  --pulse-border: rgba(245, 245, 245, 0.08);
+  --pulse-border-bright: rgba(245, 245, 245, 0.15);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--pulse-black);
+  color: var(--pulse-white);
+  font-family: var(--font-sans);
+  overflow-block: hidden;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.4);
+  }
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-5vh);
+  }
+  100% {
+    transform: translateY(105vh);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-right {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+@keyframes underline-in {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes bar-grow {
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes alert-flash {
+  0% {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes pulse-logo-dash {
+  from {
+    stroke-dashoffset: 62;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}

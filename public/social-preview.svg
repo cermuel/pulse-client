@@ -1,0 +1,61 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#0A0A0A"/>
+  <rect x="40" y="40" width="1120" height="550" rx="28" fill="#111111" stroke="rgba(245,245,245,0.08)"/>
+  <rect x="88" y="88" width="1024" height="454" rx="24" fill="url(#bgGlow)"/>
+
+  <rect x="120" y="120" width="112" height="112" rx="28" fill="#161616" stroke="rgba(245,245,245,0.10)"/>
+  <path d="M140 176H158L171 144L194 218L216 160L229 176H254" stroke="#7C3B13" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M140 176H158L171 144L194 218L216 160L229 176H254" stroke="#FB923C" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="140" cy="176" r="6" fill="#FB923C"/>
+
+  <text x="120" y="320" fill="#F5F5F5" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="700" letter-spacing="-2.5">
+    Pulse
+  </text>
+  <text x="120" y="396" fill="#F5F5F5" font-family="Arial, Helvetica, sans-serif" font-size="64" font-weight="700" letter-spacing="-2">
+    Know before they do.
+  </text>
+  <text x="120" y="454" fill="#9CA3AF" font-family="Arial, Helvetica, sans-serif" font-size="28">
+    Uptime monitoring, incident timelines, and alerts in seconds.
+  </text>
+
+  <rect x="760" y="148" width="300" height="216" rx="22" fill="#0F0F0F" stroke="rgba(245,245,245,0.08)"/>
+  <text x="792" y="194" fill="#F5F5F5" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700">
+    api.myapp.com
+  </text>
+  <rect x="932" y="172" width="96" height="26" rx="13" fill="rgba(34,197,94,0.12)"/>
+  <text x="952" y="190" fill="#22C55E" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" letter-spacing="1.4">
+    LIVE
+  </text>
+
+  <rect x="792" y="224" width="6" height="58" rx="3" fill="#22C55E"/>
+  <rect x="804" y="210" width="6" height="72" rx="3" fill="#22C55E"/>
+  <rect x="816" y="240" width="6" height="42" rx="3" fill="#FB923C"/>
+  <rect x="828" y="200" width="6" height="82" rx="3" fill="#22C55E"/>
+  <rect x="840" y="186" width="6" height="96" rx="3" fill="#22C55E"/>
+  <rect x="852" y="230" width="6" height="52" rx="3" fill="#EF4444"/>
+  <rect x="864" y="218" width="6" height="64" rx="3" fill="#22C55E"/>
+  <rect x="876" y="206" width="6" height="76" rx="3" fill="#22C55E"/>
+  <rect x="888" y="242" width="6" height="40" rx="3" fill="#FB923C"/>
+  <rect x="900" y="196" width="6" height="86" rx="3" fill="#22C55E"/>
+  <rect x="912" y="214" width="6" height="68" rx="3" fill="#22C55E"/>
+
+  <text x="792" y="328" fill="#F5F5F5" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700">99.98%</text>
+  <text x="792" y="352" fill="#6B7280" font-family="Arial, Helvetica, sans-serif" font-size="14" letter-spacing="1.2">UPTIME (30D)</text>
+  <text x="920" y="328" fill="#F5F5F5" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700">142ms</text>
+  <text x="920" y="352" fill="#6B7280" font-family="Arial, Helvetica, sans-serif" font-size="14" letter-spacing="1.2">AVG RESPONSE</text>
+
+  <rect x="760" y="394" width="300" height="92" rx="18" fill="rgba(239,68,68,0.05)" stroke="rgba(239,68,68,0.28)"/>
+  <text x="792" y="430" fill="#EF4444" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">
+    payments.myapp.com is down
+  </text>
+  <text x="792" y="458" fill="#9CA3AF" font-family="Arial, Helvetica, sans-serif" font-size="14">
+    Flair opened. Alert sent in seconds.
+  </text>
+
+  <defs>
+    <radialGradient id="bgGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(845 213) rotate(132.166) scale(566.602 799.193)">
+      <stop stop-color="rgba(251,146,60,0.12)"/>
+      <stop offset="1" stop-color="rgba(251,146,60,0)"/>
+    </radialGradient>
+  </defs>
+</svg>
