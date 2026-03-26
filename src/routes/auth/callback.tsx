@@ -52,8 +52,7 @@ function CallbackPage() {
           </h1>
           <p className="mt-3 text-sm leading-6 text-[#7a7a7a]">{error}</p>
           <p className="mt-3 text-sm leading-6 text-[#7a7a7a]">
-            Your frontend callback is running, but `/user/me` is still
-            returning `401 Unauthorized`.
+            Try signing in again or use another provider.
           </p>
           <Link
             to="/auth"

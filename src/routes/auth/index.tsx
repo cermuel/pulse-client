@@ -8,6 +8,10 @@ export const Route = createFileRoute("/auth/")({
 });
 
 function AuthIndexPage() {
+  const googleAuthUrl = new URL(
+    "/auth/google",
+    api.defaults.baseURL,
+  ).toString();
   const githubAuthUrl = new URL(
     "/auth/github",
     api.defaults.baseURL,
@@ -37,16 +41,15 @@ function AuthIndexPage() {
           </p>
 
           <div className="mt-6 grid gap-3">
-            <button
-              type="button"
-              disabled
-              className="inline-flex w-full items-center justify-center gap-3 border border-[rgba(245,245,245,0.14)] px-4 py-3 text-[#f5f5f5] opacity-60"
+            <a
+              href={googleAuthUrl}
+              className="inline-flex w-full items-center justify-center gap-3 border border-[rgba(245,245,245,0.14)] px-4 py-3 text-[#f5f5f5] transition-colors hover:border-[#fb923c] hover:text-[#fb923c]"
             >
               <FaGoogle className="h-4 w-4 shrink-0" />
               <span className="font-mono text-[11px] uppercase tracking-[0.18em]">
                 Continue with Google
               </span>
-            </button>
+            </a>
 
             <a
               href={githubAuthUrl}

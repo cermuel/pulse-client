@@ -32,6 +32,14 @@ function DashboardPage() {
   const pulses: Pulse[] = data?.pulses ?? [];
   const total = data?.total ?? 0;
   const flairs: Flair[] = flairsData?.flairs ?? [];
+  const latestFlairs = flairs
+    .slice()
+    .sort(
+      (a, b) =>
+        parseBackendDate(b.startedAt).getTime() -
+        parseBackendDate(a.startedAt).getTime(),
+    )
+    .slice(0, 3);
   const openFlairs = flairs.filter((flair) => !flair.isResolved);
   const pulseLimit = user?.plan === "free" ? 5 : null;
   const usagePercent = pulseLimit
@@ -70,16 +78,12 @@ function DashboardPage() {
                   <OverviewCard
                     title="Total pulses"
                     value={total}
-                    description="All monitors in your workspace."
+                    description=""
                   />
                   <OverviewCard
                     title="Open flairs"
                     value={openFlairs.length}
-                    description={
-                      openFlairs.length > 0
-                        ? "Incidents that still need attention."
-                        : "No active incidents right now."
-                    }
+                    description=""
                   />
                 </div>
 
@@ -140,7 +144,7 @@ function DashboardPage() {
                                 <td className="px-6 py-4 text-[13px] font-medium">
                                   {pulse.name ?? "—"}
                                 </td>
-                                <td className="px-6 py-4 font-mono text-[11px] text-[#666]">
+                                <td className="px-6 py-4 font-mono text-[11px] text-[#666] truncate max-w-54">
                                   {pulse.url}
                                 </td>
                                 <td className="px-6 py-4">
@@ -173,7 +177,7 @@ function DashboardPage() {
                                   <Link
                                     to="/dashboard/$id"
                                     params={{ id: pulse.id }}
-                                    className="font-mono text-[10px] uppercase tracking-widest text-[#333] transition-colors hover:text-[#fb923c]"
+                                    className="font-mono shrink-0 w-12! flex items-center text-[10px] uppercase tracking-widest text-[#333] transition-colors hover:text-[#fb923c]"
                                   >
                                     View →
                                   </Link>
@@ -276,7 +280,7 @@ function DashboardPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {flairs.slice(0, 5).map((flair) => (
+                            {latestFlairs.map((flair) => (
                               <tr
                                 key={flair.id}
                                 className="border-b border-[#1a1a1a] transition-colors hover:bg-[#131313]"
@@ -324,7 +328,7 @@ function DashboardPage() {
                       </div>
 
                       <div className="divide-y divide-[#1a1a1a] lg:hidden">
-                        {flairs.slice(0, 5).map((flair) => (
+                        {latestFlairs.map((flair) => (
                           <div key={flair.id} className="space-y-3 px-4 py-4">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
@@ -455,14 +459,16 @@ function OverviewCard({
   description: string;
 }) {
   return (
-    <div className="border border-[#1f1f1f] bg-[#111] px-4 py-5 sm:px-6">
+    <div className="border border-[#1f1f1f] bg-[#111] p-4 sm:px-6">
       <p className="font-mono text-[10px] uppercase tracking-widest text-[#444]">
         {title}
       </p>
-      <p className="mt-3 text-[32px] font-extrabold tracking-[-0.04em] text-[#f5f5f5]">
+      <p className="mt-2 text-[32px] font-extrabold tracking-[-0.04em] text-[#f5f5f5]">
         {value}
       </p>
-      <p className="mt-2 text-sm leading-6 text-[#666]">{description}</p>
+      {description && (
+        <p className="mt-2 text-sm leading-6 text-[#666]">{description}</p>
+      )}
     </div>
   );
 }

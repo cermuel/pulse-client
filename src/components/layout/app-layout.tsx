@@ -11,6 +11,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { data: user, isLoading, isError } = useUser();
   const navigate = useNavigate();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isError) {
@@ -36,8 +37,12 @@ export function AppLayout({ children }: AppLayoutProps) {
         <Sidebar
           user={user!}
           mobileOpen={mobileNavOpen}
+          desktopCollapsed={desktopSidebarCollapsed}
           onToggleMobile={() => setMobileNavOpen((current) => !current)}
           onCloseMobile={() => setMobileNavOpen(false)}
+          onToggleDesktopCollapse={() =>
+            setDesktopSidebarCollapsed((current) => !current)
+          }
         />
         <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-scroll">
           {children}

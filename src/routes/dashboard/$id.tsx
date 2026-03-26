@@ -1,103 +1,219 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useReducer } from "react";
+import {
+  DESKTOP_UPTIME_PAGE_SIZE,
+  PERIOD_OPTIONS,
+  PREMIUM_PERIODS,
+} from "#/constants/pulse";
 import { useUser } from "#/context/useUser";
 import api from "../../lib/api";
 import { AppLayout } from "#/components/layout/app-layout";
 import { ResponseTimeChart } from "#/components/shared/response-time-chart";
+import { DeletePulseModal } from "#/components/ui/pulse/delete-pulse-modal";
+import { EditPulseModal } from "#/components/ui/pulse/edit-pulse-modal";
+import { InlineDropdown } from "#/components/ui/pulse/inline-dropdown";
+import { MiniStat } from "#/components/ui/pulse/mini-stat";
+import { PulseDetailSkeleton } from "#/components/ui/pulse/pulse-detail-skeleton";
+import { StatCard } from "#/components/ui/pulse/stat-card";
+import { StatusDot } from "#/components/ui/pulse/status-dot";
+import {
+  formatDate,
+  parseBackendDate,
+  timeAgo,
+  timeUntil,
+} from "#/utils/helpers";
 import { Skeleton } from "#/components/shared/skeleton";
+import type {
+  Period,
+  PulseDetail,
+  ResponseTimePoint,
+  UptimePoint,
+} from "#/types/routes/pulse-detail";
 
 export const Route = createFileRoute("/dashboard/$id")({
   component: RouteComponent,
 });
 
-type Ping = {
-  isUp: boolean;
-  createdAt?: string;
+type PulseDetailUiState = {
+  isEditOpen: boolean;
+  isDeleteModalOpen: boolean;
+  deleteValue: string;
+  editError: string;
+  uptimePeriod: Period;
+  responseTimesPeriod: Period;
+  uptimeDesktopPage: number;
+  editForm: {
+    publicId: string;
+    name: string;
+    interval: number;
+    expectedStatus: number;
+  };
 };
 
-type ResponseTimePoint = {
-  responseTime: number;
+type PulseDetailUiAction =
+  | { type: "open_edit" }
+  | { type: "close_edit" }
+  | { type: "open_delete" }
+  | { type: "close_delete" }
+  | { type: "set_delete_value"; value: string }
+  | { type: "set_edit_error"; value: string }
+  | { type: "set_uptime_period"; value: Period }
+  | { type: "set_response_times_period"; value: Period }
+  | { type: "set_uptime_desktop_page"; value: number }
+  | {
+      type: "set_edit_form";
+      value: PulseDetailUiState["editForm"];
+    };
+
+const INITIAL_UI_STATE: PulseDetailUiState = {
+  isEditOpen: false,
+  isDeleteModalOpen: false,
+  deleteValue: "",
+  editError: "",
+  uptimePeriod: "4 hours",
+  responseTimesPeriod: "4 hours",
+  uptimeDesktopPage: 0,
+  editForm: {
+    publicId: "",
+    name: "",
+    interval: 300,
+    expectedStatus: 200,
+  },
 };
 
-type Flair = {
-  id: string;
-  cause: string;
-  isResolved: boolean;
-  resolvedAt: string | null;
-  startedAt: string;
-};
-
-type Pulse = {
-  id: string;
-  name: string;
-  url: string;
-  method: string;
-  interval: number;
-  isActive: boolean;
-  expectedStatus: number;
-  publicId: string;
-  createdAt: string;
-  lastCheckedAt: string | null;
-  pings: Ping[];
-  flairs: Flair[];
-};
+function pulseDetailUiReducer(
+  state: PulseDetailUiState,
+  action: PulseDetailUiAction,
+): PulseDetailUiState {
+  switch (action.type) {
+    case "open_edit":
+      return { ...state, editError: "", isEditOpen: true };
+    case "close_edit":
+      return { ...state, editError: "", isEditOpen: false };
+    case "open_delete":
+      return { ...state, deleteValue: "", isDeleteModalOpen: true };
+    case "close_delete":
+      return { ...state, isDeleteModalOpen: false };
+    case "set_delete_value":
+      return { ...state, deleteValue: action.value };
+    case "set_edit_error":
+      return { ...state, editError: action.value };
+    case "set_uptime_period":
+      return {
+        ...state,
+        uptimePeriod: action.value,
+        uptimeDesktopPage: 0,
+      };
+    case "set_response_times_period":
+      return { ...state, responseTimesPeriod: action.value };
+    case "set_uptime_desktop_page":
+      return { ...state, uptimeDesktopPage: action.value };
+    case "set_edit_form":
+      return { ...state, editForm: action.value };
+    default:
+      return state;
+  }
+}
 
 function RouteComponent() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: user } = useUser();
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteValue, setDeleteValue] = useState("");
-  const [editError, setEditError] = useState<string>("");
-  const [now, setNow] = useState(() => Date.now());
-  const [editForm, setEditForm] = useState({
-    publicId: "",
-    name: "",
-    interval: 300,
-    expectedStatus: 200,
-  });
+  const [uiState, dispatch] = useReducer(pulseDetailUiReducer, INITIAL_UI_STATE);
+  const now = useNow();
+  const {
+    isEditOpen,
+    isDeleteModalOpen,
+    deleteValue,
+    editError,
+    uptimePeriod,
+    responseTimesPeriod,
+    uptimeDesktopPage,
+    editForm,
+  } = uiState;
 
   const { data, isLoading } = useQuery({
     queryKey: ["pulse", id],
     queryFn: async () => {
       const res = await api.get(`/pulse/${id}`);
-      return res.data.pulse as Pulse;
+      return res.data.pulse as PulseDetail;
     },
   });
 
-  const { data: responseTimesData, isLoading: isResponseTimesLoading } = useQuery({
-    queryKey: ["pulse", id, "response-times"],
+  const { data: responseTimesData, isLoading: isResponseTimesLoading } =
+    useQuery({
+      queryKey: ["pulse", id, "response-times", responseTimesPeriod],
+      queryFn: async () => {
+        const res = await api.get(`/ping/${id}`, {
+          params: { period: responseTimesPeriod },
+        });
+        return res.data.times as ResponseTimePoint[];
+      },
+      enabled: Boolean(id),
+    });
+
+  const { data: uptimesData, isLoading: isUptimesLoading } = useQuery({
+    queryKey: ["pulse", id, "uptimes", uptimePeriod],
     queryFn: async () => {
-      const res = await api.get(`/ping/${id}`);
-      return res.data.times as ResponseTimePoint[];
+      const res = await api.get(`/ping/${id}/uptimes`, {
+        params: { period: uptimePeriod },
+      });
+      return res.data.times as UptimePoint[];
     },
     enabled: Boolean(id),
   });
 
   const pulse = data;
   const responseTimes = responseTimesData ?? [];
+  const uptimePoints = uptimesData ?? [];
+  const averageResponseTime =
+    responseTimes.length > 0
+      ? Math.round(
+          responseTimes.reduce((sum, point) => sum + point.responseTime, 0) /
+            responseTimes.length,
+        )
+      : null;
+  const peakResponseTime =
+    responseTimes.length > 0
+      ? Math.min(...responseTimes.map((point) => point.responseTime))
+      : null;
+  const troughResponseTime =
+    responseTimes.length > 0
+      ? Math.max(...responseTimes.map((point) => point.responseTime))
+      : null;
+  const uptimeDesktopPageCount = Math.max(
+    1,
+    Math.ceil(uptimePoints.length / DESKTOP_UPTIME_PAGE_SIZE),
+  );
+  const desktopUptimePoints = uptimePoints.slice(
+    uptimeDesktopPage * DESKTOP_UPTIME_PAGE_SIZE,
+    (uptimeDesktopPage + 1) * DESKTOP_UPTIME_PAGE_SIZE,
+  );
 
   useEffect(() => {
     if (!pulse) return;
 
-    setEditForm({
-      publicId: pulse.publicId ?? "",
-      name: pulse.name ?? "",
-      interval: pulse.interval,
-      expectedStatus: pulse.expectedStatus,
+    dispatch({
+      type: "set_edit_form",
+      value: {
+        publicId: pulse.publicId ?? "",
+        name: pulse.name ?? "",
+        interval: pulse.interval,
+        expectedStatus: pulse.expectedStatus,
+      },
     });
   }, [pulse]);
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, []);
+    if (uptimeDesktopPage > uptimeDesktopPageCount - 1) {
+      dispatch({
+        type: "set_uptime_desktop_page",
+        value: Math.max(0, uptimeDesktopPageCount - 1),
+      });
+    }
+  }, [uptimeDesktopPage, uptimeDesktopPageCount]);
 
   const deleteConfirmationOptions = useMemo(() => {
     if (!pulse) return [];
@@ -127,20 +243,20 @@ function RouteComponent() {
       return res.data;
     },
     onSuccess: async () => {
-      setEditError("");
-      setIsEditOpen(false);
+      dispatch({ type: "close_edit" });
       await queryClient.invalidateQueries({ queryKey: ["pulse", id] });
       await queryClient.invalidateQueries({ queryKey: ["pulses"] });
     },
     onError: (error: any) => {
       const message = error?.response?.data?.message;
-      setEditError(
-        Array.isArray(message)
+      dispatch({
+        type: "set_edit_error",
+        value: Array.isArray(message)
           ? message.join(", ")
           : typeof message === "string"
             ? message
             : "Couldn't update pulse",
-      );
+      });
     },
   });
 
@@ -167,9 +283,10 @@ function RouteComponent() {
   });
 
   const uptime =
-    pulse && pulse.pings.length > 0
+    uptimePoints.length > 0
       ? Math.round(
-          (pulse.pings.filter((p) => p.isUp).length / pulse.pings.length) * 100,
+          (uptimePoints.filter((p) => p.isUp).length / uptimePoints.length) *
+            100,
         )
       : null;
 
@@ -256,20 +373,14 @@ function RouteComponent() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setEditError("");
-                    setIsEditOpen((current) => !current);
-                  }}
+                  onClick={() => dispatch({ type: "open_edit" })}
                   className="cursor-pointer border border-[#1f1f1f] px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-[#666] transition-colors hover:border-[#fb923c] hover:text-[#fb923c]"
                 >
                   Edit
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setDeleteValue("");
-                    setIsDeleteModalOpen(true);
-                  }}
+                  onClick={() => dispatch({ type: "open_delete" })}
                   className="cursor-pointer border border-red-500/20 bg-red-500/5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-red-400 transition-colors hover:border-red-500/40 hover:bg-red-500/10"
                 >
                   Delete
@@ -291,8 +402,9 @@ function RouteComponent() {
                         ? "orange"
                         : "red"
                 }
+                meta={uptimePeriod}
               />
-              <StatCard label="Total pings" value={pulse.pings.length} />
+              <StatCard label="Total pings" value={uptimePoints.length} />
               <StatCard
                 label="Open flairs"
                 value={openFlairs.length}
@@ -306,113 +418,219 @@ function RouteComponent() {
             </div>
 
             {/* Ping history bar */}
-            {pulse.pings.length > 0 && (
-              <div className="mb-8 overflow-hidden border border-[#1f1f1f] bg-[#111]">
-                <div className="flex flex-col gap-4 border-b border-[#1f1f1f] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="mb-8 overflow-hidden border border-[#1f1f1f] bg-[#111]">
+              <div className="flex flex-col gap-4 border-b border-[#1f1f1f] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div>
                   <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-[#666]">
                     PING HISTORY
                   </p>
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-[#444]">
+                    Uptime checks for {uptimePeriod.toLowerCase()}
+                  </p>
+                </div>
+                <InlineDropdown
+                  label="Period"
+                  value={uptimePeriod}
+                  options={PERIOD_OPTIONS}
+                  onChange={(value) =>
+                    dispatch({ type: "set_uptime_period", value: value as Period })
+                  }
+                  disabledOptions={isFreePlan ? PREMIUM_PERIODS : []}
+                  disabledReason="Upgrade your plan to unlock 7 days, 28 days, and 365 days."
+                  className="h-32!"
+                />
+              </div>
+
+              <div className="px-4 py-5 sm:px-6">
+                {isUptimesLoading ? (
+                  <Skeleton className="h-32 w-full rounded-none" />
+                ) : uptimePoints.length === 0 ? (
+                  <div className="flex h-32 items-center justify-center text-sm text-[#555]">
+                    No uptime data for this period
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-4 flex flex-wrap items-center gap-4">
+                      <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-[#555]">
+                        <span className="h-2 w-2 rounded-full bg-green-500" />
+                        Operational
+                      </span>
+                      <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-[#555]">
+                        <span className="h-2 w-2 rounded-full bg-red-500" />
+                        Failed
+                      </span>
+                    </div>
+
+                    <div className="hide-scrollbar overflow-x-auto pb-1 lg:hidden">
+                      <div className="flex w-max items-end gap-1 rounded-sm pr-2">
+                        {uptimePoints.map((ping, i, arr) => {
+                          const isLatest = i === arr.length - 1;
+                          return (
+                            <div
+                              key={`${ping.createdAt ?? "uptime"}-${i}`}
+                              title={`${ping.isUp ? "Up" : "Down"}${ping.createdAt ? ` • ${formatDate(ping.createdAt)}` : ""}`}
+                              className={`group relative w-3 shrink-0 overflow-hidden rounded-xs transition-all hover:opacity-80 sm:w-4 ${
+                                ping.isUp ? "bg-green-500/85" : "bg-red-500/85"
+                              } ${isLatest ? "ring-1 ring-[#f5f5f5]/20" : ""}`}
+                              style={{
+                                height: ping.isUp ? "60px" : "40px",
+                              }}
+                            >
+                              <span className="absolute inset-x-0 top-0 h-px bg-white/20" />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="hidden lg:block">
+                      <div className="flex items-center gap-3">
+                        {uptimePoints.length > DESKTOP_UPTIME_PAGE_SIZE ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              dispatch({
+                                type: "set_uptime_desktop_page",
+                                value: Math.max(0, uptimeDesktopPage - 1),
+                              })
+                            }
+                            disabled={uptimeDesktopPage === 0}
+                            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center border border-[#1f1f1f] bg-[#111] font-mono text-sm text-[#666] transition-colors hover:border-[#fb923c] hover:text-[#fb923c] disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="Show previous uptime checks"
+                          >
+                            ‹
+                          </button>
+                        ) : null}
+
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <div className="flex items-end gap-1 rounded-sm">
+                            {desktopUptimePoints.map((ping, i, arr) => {
+                              const isLatest = i === arr.length - 1;
+                              return (
+                                <div
+                                  key={`${ping.createdAt ?? "desktop-uptime"}-${i}`}
+                                  title={`${ping.isUp ? "Up" : "Down"}${ping.createdAt ? ` • ${formatDate(ping.createdAt)}` : ""}`}
+                                  className={`group relative flex-1 overflow-hidden rounded-xs transition-all hover:opacity-80 ${
+                                    ping.isUp
+                                      ? "bg-green-500/85"
+                                      : "bg-red-500/85"
+                                  } ${isLatest ? "ring-1 ring-[#f5f5f5]/20" : ""}`}
+                                  style={{
+                                    height: ping.isUp ? "60px" : "40px",
+                                  }}
+                                >
+                                  <span className="absolute inset-x-0 top-0 h-px bg-white/20" />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {uptimePoints.length > DESKTOP_UPTIME_PAGE_SIZE ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              dispatch({
+                                type: "set_uptime_desktop_page",
+                                value: Math.min(
+                                  uptimeDesktopPageCount - 1,
+                                  uptimeDesktopPage + 1,
+                                ),
+                              })
+                            }
+                            disabled={
+                              uptimeDesktopPage >= uptimeDesktopPageCount - 1
+                            }
+                            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center border border-[#1f1f1f] bg-[#111] font-mono text-sm text-[#666] transition-colors hover:border-[#fb923c] hover:text-[#fb923c] disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="Show next uptime checks"
+                          >
+                            ›
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="mb-8 overflow-hidden border border-[#1f1f1f] bg-[#111]">
+              <div className="flex flex-col gap-4 border-b border-[#1f1f1f] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div>
+                  <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-[#666]">
+                    RESPONSE TIMES
+                  </p>
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-[#444]">
+                    Live monitor latency trend for{" "}
+                    {responseTimesPeriod.toLowerCase()}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <InlineDropdown
+                    label="Period"
+                    value={responseTimesPeriod}
+                    options={PERIOD_OPTIONS}
+                    onChange={(value) =>
+                      dispatch({
+                        type: "set_response_times_period",
+                        value: value as Period,
+                      })
+                    }
+                    disabledOptions={isFreePlan ? PREMIUM_PERIODS : []}
+                    disabledReason="Upgrade your plan to unlock 7 days, 28 days, and 365 days."
+                  />
                   <div className="grid grid-cols-3 gap-2 sm:min-w-70">
                     <MiniStat
-                      label="Healthy"
-                      value={pulse.pings.filter((ping) => ping.isUp).length}
+                      label="Peak"
+                      value={
+                        isResponseTimesLoading
+                          ? "..."
+                          : peakResponseTime !== null
+                            ? `${peakResponseTime}ms`
+                            : "—"
+                      }
                       tone="green"
                     />
                     <MiniStat
-                      label="Failed"
-                      value={pulse.pings.filter((ping) => !ping.isUp).length}
-                      tone="red"
-                    />
-                    <MiniStat
-                      label="Interval"
-                      value={formatInterval(pulse.interval)}
-                    />
-                  </div>
-                </div>
-
-                <div className="px-4 py-5 sm:px-6">
-                  <div className="mb-4 flex flex-wrap items-center gap-4">
-                    <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-[#555]">
-                      <span className="h-2 w-2 rounded-full bg-green-500" />
-                      Operational
-                    </span>
-                    <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-[#555]">
-                      <span className="h-2 w-2 rounded-full bg-red-500" />
-                      Failed
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <div className="flex min-w-120 items-end gap-1 rounded-sm">
-                      {pulse.pings.slice(-80).map((ping, i, arr) => {
-                        const isLatest = i === arr.length - 1;
-                        return (
-                          <div
-                            key={i}
-                            title={`${ping.isUp ? "Up" : "Down"}${ping.createdAt ? ` • ${formatDate(ping.createdAt)}` : ""}`}
-                            className={`group relative flex-1 overflow-hidden rounded-xs transition-all hover:opacity-80 ${
-                              ping.isUp ? "bg-green-500/85" : "bg-red-500/85"
-                            } ${isLatest ? "ring-1 ring-[#f5f5f5]/20" : ""}`}
-                            style={{
-                              height: ping.isUp ? "56px" : "26px",
-                            }}
-                          >
-                            <span className="absolute inset-x-0 top-0 h-px bg-white/20" />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {responseTimes.length > 0 && (
-              <div className="mb-8 overflow-hidden border border-[#1f1f1f] bg-[#111]">
-                <div className="flex flex-col gap-4 border-b border-[#1f1f1f] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                  <div>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-[#666]">
-                      RESPONSE TIMES
-                    </p>
-                    <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-[#444]">
-                      Live monitor latency trend
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 sm:min-w-70">
-                    <MiniStat
-                      label="Latest"
-                      value={`${responseTimes.at(-1)?.responseTime ?? 0}ms`}
-                      tone="orange"
-                    />
-                    <MiniStat
                       label="Average"
-                      value={`${Math.round(
-                        responseTimes.reduce(
-                          (sum, point) => sum + point.responseTime,
-                          0,
-                        ) / responseTimes.length,
-                      )}ms`}
+                      value={
+                        isResponseTimesLoading
+                          ? "..."
+                          : averageResponseTime !== null
+                            ? `${averageResponseTime}ms`
+                            : "—"
+                      }
                     />
                     <MiniStat
-                      label="Peak"
-                      value={`${Math.max(
-                        ...responseTimes.map((point) => point.responseTime),
-                      )}ms`}
+                      label="Trough"
+                      value={
+                        isResponseTimesLoading
+                          ? "..."
+                          : troughResponseTime !== null
+                            ? `${troughResponseTime}ms`
+                            : "—"
+                      }
                       tone="red"
                     />
                   </div>
                 </div>
-
-                <div className="px-4 py-5 sm:px-6">
-                  <ResponseTimeChart
-                    values={responseTimes.slice(-40).map((point) => point.responseTime)}
-                    loading={isResponseTimesLoading}
-                  />
-                </div>
               </div>
-            )}
 
-            {/* Flairs */}
+              <div className="px-4 py-5 sm:px-6">
+                {isResponseTimesLoading ? (
+                  <ResponseTimeChart values={[]} loading />
+                ) : responseTimes.length === 0 ? (
+                  <div className="flex h-48 items-center justify-center text-sm text-[#555]">
+                    No response time data for this period
+                  </div>
+                ) : (
+                  <ResponseTimeChart
+                    values={responseTimes.map((point) => point.responseTime)}
+                  />
+                )}
+              </div>
+            </div>
+
             <div className="border border-[#1f1f1f]">
               <div className="border-b border-[#1f1f1f] px-6 py-4 flex items-center justify-between">
                 <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-[#666]">
@@ -435,7 +653,11 @@ function RouteComponent() {
                 <div>
                   {pulse.flairs
                     .slice()
-                    .reverse()
+                    .sort(
+                      (a, b) =>
+                        parseBackendDate(b.startedAt).getTime() -
+                        parseBackendDate(a.startedAt).getTime(),
+                    )
                     .map((flair) => (
                       <Link
                         key={flair.id}
@@ -444,38 +666,38 @@ function RouteComponent() {
                         className="block border-b border-[#191919] px-4 py-4 transition-colors hover:bg-[#141414] last:border-0 sm:px-6"
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
-                        <span
-                          className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-                            flair.isResolved
-                              ? "bg-green-500"
-                              : "bg-red-500 animate-pulse"
-                          }`}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-[#f5f5f5]">
-                            {flair.cause || "Service unreachable"}
-                          </p>
-                          <p className="mt-2 font-mono text-[10px] text-[#555]">
-                            Started {formatDate(flair.startedAt)}
-                            {flair.resolvedAt
-                              ? ` · Resolved ${formatDate(flair.resolvedAt)}`
-                              : ""}
-                          </p>
-                        </div>
-                        <span
-                          className={`inline-flex items-center gap-2 self-start border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider sm:shrink-0 ${
-                            flair.isResolved
-                              ? "border-green-500/20 bg-green-500/5 text-green-500"
-                              : "border-red-500/20 bg-red-500/5 text-red-400"
-                          }`}
-                        >
                           <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              flair.isResolved ? "bg-green-500" : "bg-red-500"
+                            className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                              flair.isResolved
+                                ? "bg-green-500"
+                                : "bg-red-500 animate-pulse"
                             }`}
                           />
-                          {flair.isResolved ? "Resolved" : "Open"}
-                        </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-medium text-[#f5f5f5]">
+                              {flair.cause || "Service unreachable"}
+                            </p>
+                            <p className="mt-2 font-mono text-[10px] text-[#555]">
+                              Started {formatDate(flair.startedAt)}
+                              {flair.resolvedAt
+                                ? ` · Resolved ${formatDate(flair.resolvedAt)}`
+                                : ""}
+                            </p>
+                          </div>
+                          <span
+                            className={`inline-flex items-center gap-2 self-start border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider sm:shrink-0 ${
+                              flair.isResolved
+                                ? "border-green-500/20 bg-green-500/5 text-green-500"
+                                : "border-red-500/20 bg-red-500/5 text-red-400"
+                            }`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                flair.isResolved ? "bg-green-500" : "bg-red-500"
+                              }`}
+                            />
+                            {flair.isResolved ? "Resolved" : "Open"}
+                          </span>
                         </div>
                       </Link>
                     ))}
@@ -493,15 +715,25 @@ function RouteComponent() {
           form={editForm}
           errorMessage={editError}
           isSaving={editPulse.isPending}
-          onChange={setEditForm}
+          onChange={(updater) =>
+            dispatch({
+              type: "set_edit_form",
+              value:
+                typeof updater === "function"
+                  ? updater(uiState.editForm)
+                  : updater,
+            })
+          }
           onClose={() => {
-            setEditError("");
-            setIsEditOpen(false);
-            setEditForm({
-              publicId: pulse.publicId ?? "",
-              name: pulse.name ?? "",
-              interval: pulse.interval,
-              expectedStatus: pulse.expectedStatus,
+            dispatch({ type: "close_edit" });
+            dispatch({
+              type: "set_edit_form",
+              value: {
+                publicId: pulse.publicId ?? "",
+                name: pulse.name ?? "",
+                interval: pulse.interval,
+                expectedStatus: pulse.expectedStatus,
+              },
             });
           }}
           onSave={() => editPulse.mutate()}
@@ -512,7 +744,9 @@ function RouteComponent() {
         <DeletePulseModal
           pulse={pulse}
           confirmationValue={deleteValue}
-          onConfirmationChange={setDeleteValue}
+          onConfirmationChange={(value) =>
+            dispatch({ type: "set_delete_value", value })
+          }
           canDelete={Boolean(deleteMatches)}
           isDeleting={deletePulse.isPending}
           errorMessage={
@@ -520,7 +754,7 @@ function RouteComponent() {
               ? deletePulse.error.message
               : (deletePulse.error as any)?.response?.data?.message
           }
-          onClose={() => setIsDeleteModalOpen(false)}
+          onClose={() => dispatch({ type: "close_delete" })}
           onDelete={() => deletePulse.mutate()}
         />
       )}
@@ -528,419 +762,16 @@ function RouteComponent() {
   );
 }
 
-function StatusDot({ status }: { status: "up" | "down" | "pending" }) {
-  if (status === "up")
-    return (
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-60" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
-      </span>
-    );
-  if (status === "down")
-    return <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />;
-  return <span className="h-2 w-2 rounded-full bg-[#333]" />;
-}
+function useNow() {
+  const [now, setNow] = useReducer(() => Date.now(), Date.now());
 
-function StatCard({
-  label,
-  value,
-  accent,
-  meta,
-}: {
-  label: string;
-  value: string | number;
-  accent?: "green" | "orange" | "red";
-  meta?: string;
-}) {
-  const colors = {
-    green: "text-green-500",
-    orange: "text-[#fb923c]",
-    red: "text-red-400",
-  };
-  return (
-    <div className="border border-[#1f1f1f] bg-[#111] px-5 py-4">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-[#444]">
-        {label}
-      </p>
-      <p
-        className={`mt-2 text-[26px] font-extrabold tracking-[-0.03em] tabular-nums ${
-          accent ? colors[accent] : ""
-        }`}
-      >
-        {value}
-      </p>
-      {meta ? (
-        <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-[#444] tabular-nums">
-          {meta}
-        </p>
-      ) : null}
-    </div>
-  );
-}
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow();
+    }, 1000);
 
-function MiniStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  tone?: "green" | "red" | "orange";
-}) {
-  const toneClass =
-    tone === "green"
-      ? "text-green-500"
-      : tone === "orange"
-      ? "text-[#fb923c]"
-      : tone === "red"
-        ? "text-red-400"
-        : "text-[#f5f5f5]";
+    return () => window.clearInterval(intervalId);
+  }, []);
 
-  return (
-    <div className="border border-[#1a1a1a] bg-[#0d0d0d] px-3 py-3">
-      <p className="font-mono text-[9px] uppercase tracking-widest text-[#444]">
-        {label}
-      </p>
-      <p className={`mt-1 text-sm font-semibold ${toneClass}`}>{value}</p>
-    </div>
-  );
-}
-
-function PulseDetailSkeleton() {
-  return (
-    <div>
-      <div className="mb-8">
-        <Skeleton className="h-3 w-24 rounded-none mb-3" />
-        <Skeleton className="h-8 w-64 rounded-none mb-2" />
-        <Skeleton className="h-3 w-48 rounded-none" />
-      </div>
-      <div className="grid grid-cols-2 gap-3 mb-8 xl:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="border border-[#1f1f1f] bg-[#111] px-5 py-4">
-            <Skeleton className="h-2.5 w-20 rounded-none mb-3" />
-            <Skeleton className="h-7 w-12 rounded-none" />
-          </div>
-        ))}
-      </div>
-      <div className="border border-[#1f1f1f] bg-[#111] px-6 py-5 mb-8">
-        <Skeleton className="h-2.5 w-20 rounded-none mb-4" />
-        <Skeleton className="h-10 w-full rounded-none" />
-      </div>
-    </div>
-  );
-}
-
-function timeAgo(dateStr: string, now = Date.now()) {
-  const diff = now - parseBackendDate(dateStr).getTime();
-  const secs = Math.floor(diff / 1000);
-  if (secs < 1) return "0s ago";
-  if (secs < 60) return `${secs}s ago`;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
-function timeUntil(target: number, now = Date.now()) {
-  const diff = target - now;
-  if (diff <= 0) return "due now";
-  const secs = Math.ceil(diff / 1000);
-  if (secs < 60) return `in ${secs}s`;
-  const mins = Math.ceil(secs / 60);
-  if (mins < 60) return `in ${mins}m`;
-  const hrs = Math.ceil(mins / 60);
-  return `in ${hrs}h`;
-}
-
-function formatInterval(seconds: number) {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds % 3600 === 0) return `${seconds / 3600}h`;
-  if (seconds % 60 === 0) return `${seconds / 60}m`;
-  return `${seconds}s`;
-}
-
-function formatDate(dateStr: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(parseBackendDate(dateStr));
-}
-
-function parseBackendDate(dateStr: string) {
-  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(dateStr);
-  return new Date(hasTimezone ? dateStr : `${dateStr}Z`);
-}
-
-function DeletePulseModal({
-  pulse,
-  confirmationValue,
-  onConfirmationChange,
-  canDelete,
-  isDeleting,
-  errorMessage,
-  onClose,
-  onDelete,
-}: {
-  pulse: Pulse;
-  confirmationValue: string;
-  onConfirmationChange: (value: string) => void;
-  canDelete: boolean;
-  isDeleting: boolean;
-  errorMessage?: string;
-  onClose: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div className="w-full max-w-md border border-[rgba(245,245,245,0.08)] bg-[#111] p-5 sm:p-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#fb923c]">
-          Delete pulse
-        </p>
-        <h2 className="mt-4 text-2xl font-semibold text-[#f5f5f5]">
-          This action is permanent
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-[#7a7a7a]">
-          Type{" "}
-          <span className="text-[#f5f5f5]">{pulse.name || pulse.publicId}</span>{" "}
-          or <span className="text-[#f5f5f5]">{pulse.publicId}</span> to confirm
-          deletion.
-        </p>
-
-        <input
-          type="text"
-          value={confirmationValue}
-          onChange={(event) => onConfirmationChange(event.target.value)}
-          placeholder={pulse.name || pulse.publicId}
-          className="mt-6 w-full border border-[rgba(245,245,245,0.14)] bg-[#161616] px-4 py-3 font-mono text-[12px] text-[#f5f5f5] outline-none transition-colors focus:border-[#fb923c]"
-        />
-
-        {errorMessage ? (
-          <p className="mt-3 text-sm text-red-400">
-            {Array.isArray(errorMessage)
-              ? errorMessage.join(", ")
-              : errorMessage}
-          </p>
-        ) : null}
-
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex cursor-pointer items-center justify-center border border-[rgba(245,245,245,0.14)] px-4 py-3 font-mono text-[11px] uppercase tracking-[0.18em] text-[#f5f5f5] transition-colors hover:border-[#fb923c] hover:text-[#fb923c]"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={!canDelete || isDeleting}
-            className="inline-flex cursor-pointer items-center justify-center border border-red-500/30 bg-red-500/10 px-4 py-3 font-mono text-[11px] uppercase tracking-[0.18em] text-red-400 transition-colors hover:border-red-500/50 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {isDeleting ? "Deleting..." : "Delete pulse"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EditPulseModal({
-  pulse,
-  isFreePlan,
-  form,
-  errorMessage,
-  isSaving,
-  onChange,
-  onClose,
-  onSave,
-}: {
-  pulse: Pulse;
-  isFreePlan: boolean;
-  form: {
-    publicId: string;
-    name: string;
-    interval: number;
-    expectedStatus: number;
-  };
-  errorMessage?: string;
-  isSaving: boolean;
-  onChange: React.Dispatch<
-    React.SetStateAction<{
-      publicId: string;
-      name: string;
-      interval: number;
-      expectedStatus: number;
-    }>
-  >;
-  onClose: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div className="w-full max-w-2xl border border-[rgba(245,245,245,0.08)] bg-[#111] p-5 sm:p-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#fb923c]">
-          Edit pulse
-        </p>
-        <h2 className="mt-4 text-2xl font-semibold text-[#f5f5f5]">
-          Update monitor settings
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-[#7a7a7a]">
-          Change the core pulse settings for{" "}
-          <span className="text-[#f5f5f5]">{pulse.name || pulse.publicId}</span>
-          .
-        </p>
-
-        {errorMessage && (
-          <div className="mt-6 border border-red-500/20 bg-red-500/5 px-4 py-3 font-mono text-[11px] text-red-400">
-            {errorMessage}
-          </div>
-        )}
-
-        <form
-          className="mt-6 space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSave();
-          }}
-        >
-          <input
-            type="text"
-            placeholder="Name (optional)"
-            value={form.name}
-            onChange={(event) =>
-              onChange((current) => ({ ...current, name: event.target.value }))
-            }
-            className="w-full border border-[#1f1f1f] bg-[#111] px-5 py-3.5 font-mono text-[13px] text-[#f5f5f5] placeholder-[#2a2a2a] outline-none transition-colors focus:border-[#fb923c]"
-          />
-
-          <div className="flex items-center border border-[#1f1f1f] bg-[#111] transition-colors focus-within:border-[#fb923c]">
-            <span className="border-r border-[#1f1f1f] px-4 py-3.5 font-mono text-[11px] text-[#2a2a2a]">
-              pulse.app/s/
-            </span>
-            <input
-              type="text"
-              placeholder="public-id (optional)"
-              value={form.publicId}
-              onChange={(event) =>
-                onChange((current) => ({
-                  ...current,
-                  publicId: event.target.value,
-                }))
-              }
-              className="flex-1 bg-transparent px-4 py-3.5 font-mono text-[13px] text-[#f5f5f5] placeholder-[#2a2a2a] outline-none"
-            />
-          </div>
-
-          <div className="space-y-4 border border-[#1a1a1a] p-4">
-            <div>
-              <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-[#333]">
-                Check interval
-              </p>
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-0">
-                {[
-                  { label: "1m", value: 60 },
-                  { label: "5m", value: 300 },
-                  { label: "10m", value: 600 },
-                  { label: "30m", value: 1800 },
-                  { label: "1h", value: 3600 },
-                ].map(({ label, value }) => {
-                  const isDisabled = isFreePlan && value === 60;
-                  return (
-                    <div
-                      key={value}
-                      className={`group relative flex-1 ${isDisabled ? "z-10" : ""}`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          !isDisabled &&
-                          onChange((current) => ({
-                            ...current,
-                            interval: value,
-                          }))
-                        }
-                        disabled={isDisabled}
-                        className={`w-full border py-2.5 font-mono text-[10px] uppercase tracking-wider transition-colors sm:border-b sm:border-r sm:border-t sm:first:border-l ${
-                          form.interval === value
-                            ? "border-[#fb923c] bg-[#fb923c]/10 text-[#fb923c]"
-                            : isDisabled
-                              ? "cursor-not-allowed border-[#1f1f1f] bg-[#0e0e0e] text-[#2f2f2f] line-through"
-                              : "cursor-pointer border-[#1f1f1f] bg-[#0e0e0e] text-[#444] hover:text-[#f5f5f5]"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                      {isDisabled && (
-                        <div className="pointer-events-none absolute -top-11 left-1/2 hidden -translate-x-1/2 whitespace-nowrap border border-[#2a2a2a] bg-[#0b0b0b] px-3 py-2 font-mono text-[10px] text-[#f5f5f5] shadow-[0_12px_24px_rgba(0,0,0,0.35)] group-hover:block">
-                          1m checks are available on Pro only.
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-[#333]">
-                Expected status
-              </p>
-              <div className="grid grid-cols-3 gap-2 sm:flex sm:gap-0">
-                {[200, 201, 204, 301, 302].map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() =>
-                      onChange((current) => ({
-                        ...current,
-                        expectedStatus: status,
-                      }))
-                    }
-                    className={`cursor-pointer border py-2.5 font-mono text-[10px] tracking-wider transition-colors sm:flex-1 sm:border-b sm:border-r sm:border-t sm:first:border-l ${
-                      form.expectedStatus === status
-                        ? "border-[#fb923c] bg-[#fb923c]/10 text-[#fb923c]"
-                        : "border-[#1f1f1f] bg-[#0e0e0e] text-[#444] hover:text-[#f5f5f5]"
-                    }`}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex cursor-pointer items-center justify-center border border-[rgba(245,245,245,0.14)] px-4 py-3 font-mono text-[11px] uppercase tracking-[0.18em] text-[#f5f5f5] transition-colors hover:border-[#fb923c] hover:text-[#fb923c]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="inline-flex cursor-pointer items-center justify-center bg-[#fb923c] px-4 py-3 font-mono text-[11px] uppercase tracking-[0.18em] text-[#0e0e0e] transition-colors hover:bg-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSaving ? "Saving..." : "Save changes"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+  return now;
 }

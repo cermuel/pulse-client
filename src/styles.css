@@ -31,6 +31,15 @@ body {
   overflow-block: hidden;
 }
 
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 @keyframes pulse-dot {
   0%,
   100% {

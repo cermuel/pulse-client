@@ -179,14 +179,14 @@ function PulsesPage() {
                         params={{ id: pulse.id }}
                         className="min-w-0 flex-1"
                       >
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-medium text-[#f5f5f5]">
-                        {pulse.name || "Untitled pulse"}
-                      </p>
-                      <p className="mt-1 break-all font-mono text-[11px] text-[#666]">
-                        {pulse.url}
-                      </p>
-                    </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-medium text-[#f5f5f5]">
+                            {pulse.name || "Untitled pulse"}
+                          </p>
+                          <p className="mt-1 break-all font-mono text-[11px] text-[#666]">
+                            {pulse.url}
+                          </p>
+                        </div>
                       </Link>
                       <div className="flex flex-wrap gap-2 lg:justify-end">
                         <span className="border border-[#1f1f1f] px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-[#555]">
