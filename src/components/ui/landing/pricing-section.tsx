@@ -1,66 +1,69 @@
-import { pricingPlans } from "./landing-data";
 import { SectionHeader } from "./section-header";
 
 export function PricingSection() {
   return (
     <section id="pricing" className="border-t border-(--pulse-border) px-6 py-20 lg:px-15 lg:py-30">
       <div className="mx-auto max-w-360">
-        <SectionHeader tag="Pricing" />
+        <SectionHeader
+          tag="Pricing"
+          title={"Free for now.\nNot forever."}
+        />
 
-        <div className="mt-16 grid gap-px border border-(--pulse-border) bg-(--pulse-border) lg:grid-cols-3">
-          {pricingPlans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`px-9 py-10 ${
-                plan.featured
-                  ? "-m-px border border-(--pulse-orange) bg-(--pulse-black-2)"
-                  : "bg-(--pulse-black)"
-              }`}
-            >
-              {plan.featured ? (
-                <div className="mb-5 inline-block bg-(--pulse-orange) px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-(--pulse-black)">
-                  Most popular
-                </div>
-              ) : null}
-              <div className="mb-4 font-mono text-xs uppercase tracking-widest text-(--pulse-muted)">
-                {plan.name}
-              </div>
-              <div className="text-[52px] leading-none font-extrabold tracking-[-0.04em]">
-                <sup className="mr-0.5 inline-block align-top text-xl font-semibold">
-                  $
-                </sup>
-                {plan.price}
-              </div>
-              <div className="mt-2 font-mono text-[13px] text-(--pulse-muted)">
-                {plan.period}
-              </div>
-
-              <ul className="my-8 space-y-0">
-                {plan.features.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-center gap-3 border-b border-(--pulse-border) py-2.5 text-[13px] text-(--pulse-muted)"
-                  >
-                    <span className="h-1 w-1 shrink-0 rounded-full bg-(--pulse-orange)" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-
-              <a
-                href="#"
-                className={`block px-6 py-3.5 text-center font-mono text-xs font-medium uppercase tracking-[0.08em] transition-all ${
-                  plan.featured
-                    ? "border border-(--pulse-orange) bg-(--pulse-orange) text-(--pulse-black) hover:border-(--pulse-white) hover:bg-(--pulse-white)"
-                    : "border border-(--pulse-border-bright) text-(--pulse-white-2) hover:border-(--pulse-orange) hover:text-(--pulse-orange)"
-                }`}
-              >
-                {plan.cta}
-              </a>
+        <div className="mt-16 border border-(--pulse-border) bg-(--pulse-black)">
+          <div className="border-b border-(--pulse-border) px-8 py-8 lg:px-10 lg:py-10">
+            <div className="inline-block bg-(--pulse-orange) px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-(--pulse-black)">
+              Coming soon
             </div>
-          ))}
+            <p className="mt-6 max-w-3xl text-[15px] leading-8 text-(--pulse-muted)">
+              Pulse is fully open while we finish the billing experience. Use
+              every feature, push it hard, and expect a clear heads-up before
+              paid plans land.
+            </p>
+          </div>
+
+          <div className="grid gap-px bg-(--pulse-border) md:grid-cols-3">
+            <InfoCard
+              label="Right now"
+              title="Everything unlocked"
+              description="Monitoring, alerts, flairs, and status pages are all available while pricing is still in the oven."
+            />
+            <InfoCard
+              label="What changes"
+              title="Paid plans are coming"
+              description="We’ll introduce simple pricing once the billing flow is ready and the product earns it."
+            />
+            <InfoCard
+              label="No surprises"
+              title="You’ll get notice first"
+              description="Nothing flips silently. We’ll make the switch clear before any billing starts."
+            />
+          </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function InfoCard({
+  label,
+  title,
+  description,
+}: {
+  label: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="bg-(--pulse-black) px-8 py-8">
+      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-(--pulse-muted)">
+        {label}
+      </p>
+      <p className="mt-3 text-[22px] leading-tight font-bold tracking-[-0.03em] text-(--pulse-white)">
+        {title}
+      </p>
+      <p className="mt-3 text-[14px] leading-7 text-(--pulse-muted)">
+        {description}
+      </p>
+    </div>
   );
 }
