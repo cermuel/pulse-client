@@ -15,7 +15,8 @@ function CallbackPage() {
     let cancelled = false;
 
     const completeSignIn = async () => {
-      for (let attempt = 0; attempt < 4; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 800));
+      for (let attempt = 0; attempt < 6; attempt += 1) {
         try {
           await api.get("/user/me");
           if (cancelled) return;
@@ -24,12 +25,15 @@ function CallbackPage() {
           navigate({ to: "/dashboard" });
           return;
         } catch {
-          await new Promise((resolve) => window.setTimeout(resolve, 500));
+          const delay = Math.min(500 * Math.pow(2, attempt), 4000);
+          await new Promise((resolve) => window.setTimeout(resolve, delay));
         }
       }
 
       if (!cancelled) {
-        setError("We couldn't find an authenticated session after the callback.");
+        setError(
+          "We couldn't find an authenticated session after the callback.",
+        );
       }
     };
 
@@ -42,7 +46,7 @@ function CallbackPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#111] px-6">
+      <div className="flex h-dvh items-center justify-center bg-[#111] px-6">
         <div className="w-full max-w-md border border-[rgba(245,245,245,0.08)] bg-[#161616] p-6 text-center">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#fb923c]">
             Auth error

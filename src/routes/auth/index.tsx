@@ -18,7 +18,7 @@ function AuthIndexPage() {
   ).toString();
 
   return (
-    <main className="relative min-h-screen bg-(--pulse-black) px-6 py-10 text-(--pulse-white) lg:px-15">
+    <main className="relative h-dvh bg-(--pulse-black) px-6 py-10 text-(--pulse-white) lg:px-15">
       <div className="flex min-h-[calc(100vh-88px)] items-center justify-center">
         <div className="w-full max-w-md border border-(--pulse-border) bg-(--pulse-black-2) p-6 sm:p-8">
           <div className="mb-5 flex items-center gap-3">
