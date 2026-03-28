@@ -1,4 +1,4 @@
-import type { Period } from "#/types/routes/pulse-detail";
+import type { Period, PulseDetailUiState } from "#/types/routes/pulse-detail";
 
 export const PERIOD_OPTIONS = [
   { label: "4 hours", value: "4 hours" },
@@ -10,3 +10,19 @@ export const PERIOD_OPTIONS = [
 
 export const PREMIUM_PERIODS: Period[] = ["7 days", "28 days", "365 days"];
 export const DESKTOP_UPTIME_PAGE_SIZE = 50;
+
+export const INITIAL_UI_STATE: PulseDetailUiState = {
+  isEditOpen: false,
+  isDeleteModalOpen: false,
+  deleteValue: "",
+  editError: "",
+  uptimePeriod: "4 hours",
+  responseTimesPeriod: "4 hours",
+  uptimeDesktopPage: 0,
+  editForm: {
+    publicId: "",
+    name: "",
+    interval: 300,
+    expectedStatus: 200,
+  },
+};

@@ -4,6 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { User } from "#/context/useUser";
 import { PulseLogo } from "#/components/shared/pulse-logo";
 import { FiLogOut } from "react-icons/fi";
+import { AiOutlineLoading3Quarters } from "react-icons/ai";
+import { useSocket } from "#/context/socket-context";
+import { useState } from "react";
 
 type SidebarProps = {
   user: User;
@@ -32,12 +35,17 @@ export function Sidebar({
 }: SidebarProps) {
   const queryClient = useQueryClient();
   const routerState = useRouterState();
+  const { socket } = useSocket();
   const currentPath = routerState.location.pathname;
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
+    setLoggingOut(true);
     await api.post("/auth/logout");
     queryClient.clear();
+    socket?.disconnect();
     window.location.href = "/";
+    setLoggingOut(false);
   };
 
   return (
@@ -68,9 +76,7 @@ export function Sidebar({
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[82vw] shrink-0 flex-col border-r border-[#1f1f1f] bg-[#0e0e0e] transition-[width,transform] duration-300 lg:static lg:h-auto lg:max-w-none lg:translate-x-0 ${
           desktopCollapsed ? "lg:w-20" : "lg:w-55"
-        } ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div
           className={`flex items-center border-b border-[#1f1f1f] py-5 transition-[padding] duration-300 ${
@@ -105,19 +111,21 @@ export function Sidebar({
               className="ml-auto hidden h-8 w-8 cursor-pointer items-center justify-center border border-[#1f1f1f] text-[#666] transition-colors hover:border-[#fb923c] hover:text-[#fb923c] lg:inline-flex"
               aria-label="Collapse sidebar"
             >
-              <span className="text-sm transition-transform duration-300">‹</span>
+              <span className="text-sm transition-transform duration-300">
+                ‹
+              </span>
             </button>
           ) : null}
         </div>
 
         <nav className="flex-1 px-3 py-4">
           <ul className="space-y-0.5">
-          {navItems.map(({ label, href, icon: Icon }) => {
-            const active =
-              href === "/dashboard"
-                ? currentPath === href
-                : currentPath === href || currentPath.startsWith(`${href}/`);
-            return (
+            {navItems.map(({ label, href, icon: Icon }) => {
+              const active =
+                href === "/dashboard"
+                  ? currentPath === href
+                  : currentPath === href || currentPath.startsWith(`${href}/`);
+              return (
                 <li key={href}>
                   <Link
                     to={href}
@@ -170,14 +178,24 @@ export function Sidebar({
           </div>
           <button
             onClick={handleLogout}
+            disabled={loggingOut}
             title={desktopCollapsed ? "Sign out" : undefined}
-            className={`mt-3 cursor-pointer font-mono text-[10px] uppercase tracking-widest transition-all duration-300 ${
+            className={`mt-3 disabled:cursor-not-allowed disabled:border-[#1f1f1f] disabled:opacity-60 cursor-pointer font-mono text-[10px] uppercase tracking-widest transition-all duration-300 ${
               desktopCollapsed
                 ? "hidden w-full items-center justify-center text-red-400 hover:text-red-300 lg:flex"
                 : "w-full border border-[#1f1f1f] py-2 text-[#444] hover:border-[#fb923c] hover:text-[#fb923c]"
             }`}
           >
-            {desktopCollapsed ? <FiLogOut className="h-3.5 w-3.5" /> : "Sign out"}
+            {loggingOut ? (
+              <AiOutlineLoading3Quarters
+                className="h-3.5 w-3.5 animate-spin mx-auto"
+                color="#fb923c"
+              />
+            ) : desktopCollapsed ? (
+              <FiLogOut className="h-3.5 w-3.5" />
+            ) : (
+              "Sign out"
+            )}
           </button>
         </div>
       </aside>
