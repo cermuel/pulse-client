@@ -17,8 +17,10 @@ import { Route as DashboardSettingsRouteImport } from './routes/dashboard/settin
 import { Route as DashboardBillingRouteImport } from './routes/dashboard/billing'
 import { Route as DashboardIdRouteImport } from './routes/dashboard/$id'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as StatsIdIndexRouteImport } from './routes/stats/$id/index'
 import { Route as DashboardPulsesIndexRouteImport } from './routes/dashboard/pulses/index'
 import { Route as DashboardFlairsIndexRouteImport } from './routes/dashboard/flairs/index'
+import { Route as StatsIdPulseIdRouteImport } from './routes/stats/$id/$pulseId'
 import { Route as DashboardPulsesNewRouteImport } from './routes/dashboard/pulses/new'
 import { Route as DashboardFlairsIdRouteImport } from './routes/dashboard/flairs/$id'
 
@@ -62,6 +64,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StatsIdIndexRoute = StatsIdIndexRouteImport.update({
+  id: '/stats/$id/',
+  path: '/stats/$id/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardPulsesIndexRoute = DashboardPulsesIndexRouteImport.update({
   id: '/dashboard/pulses/',
   path: '/dashboard/pulses/',
@@ -70,6 +77,11 @@ const DashboardPulsesIndexRoute = DashboardPulsesIndexRouteImport.update({
 const DashboardFlairsIndexRoute = DashboardFlairsIndexRouteImport.update({
   id: '/dashboard/flairs/',
   path: '/dashboard/flairs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatsIdPulseIdRoute = StatsIdPulseIdRouteImport.update({
+  id: '/stats/$id/$pulseId',
+  path: '/stats/$id/$pulseId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardPulsesNewRoute = DashboardPulsesNewRouteImport.update({
@@ -94,8 +106,10 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/flairs/$id': typeof DashboardFlairsIdRoute
   '/dashboard/pulses/new': typeof DashboardPulsesNewRoute
+  '/stats/$id/$pulseId': typeof StatsIdPulseIdRoute
   '/dashboard/flairs/': typeof DashboardFlairsIndexRoute
   '/dashboard/pulses/': typeof DashboardPulsesIndexRoute
+  '/stats/$id/': typeof StatsIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -108,8 +122,10 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/flairs/$id': typeof DashboardFlairsIdRoute
   '/dashboard/pulses/new': typeof DashboardPulsesNewRoute
+  '/stats/$id/$pulseId': typeof StatsIdPulseIdRoute
   '/dashboard/flairs': typeof DashboardFlairsIndexRoute
   '/dashboard/pulses': typeof DashboardPulsesIndexRoute
+  '/stats/$id': typeof StatsIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -123,8 +139,10 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/flairs/$id': typeof DashboardFlairsIdRoute
   '/dashboard/pulses/new': typeof DashboardPulsesNewRoute
+  '/stats/$id/$pulseId': typeof StatsIdPulseIdRoute
   '/dashboard/flairs/': typeof DashboardFlairsIndexRoute
   '/dashboard/pulses/': typeof DashboardPulsesIndexRoute
+  '/stats/$id/': typeof StatsIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -139,8 +157,10 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/dashboard/flairs/$id'
     | '/dashboard/pulses/new'
+    | '/stats/$id/$pulseId'
     | '/dashboard/flairs/'
     | '/dashboard/pulses/'
+    | '/stats/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -153,8 +173,10 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/dashboard/flairs/$id'
     | '/dashboard/pulses/new'
+    | '/stats/$id/$pulseId'
     | '/dashboard/flairs'
     | '/dashboard/pulses'
+    | '/stats/$id'
   id:
     | '__root__'
     | '/'
@@ -167,8 +189,10 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/dashboard/flairs/$id'
     | '/dashboard/pulses/new'
+    | '/stats/$id/$pulseId'
     | '/dashboard/flairs/'
     | '/dashboard/pulses/'
+    | '/stats/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -182,8 +206,10 @@ export interface RootRouteChildren {
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardFlairsIdRoute: typeof DashboardFlairsIdRoute
   DashboardPulsesNewRoute: typeof DashboardPulsesNewRoute
+  StatsIdPulseIdRoute: typeof StatsIdPulseIdRoute
   DashboardFlairsIndexRoute: typeof DashboardFlairsIndexRoute
   DashboardPulsesIndexRoute: typeof DashboardPulsesIndexRoute
+  StatsIdIndexRoute: typeof StatsIdIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -244,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/stats/$id/': {
+      id: '/stats/$id/'
+      path: '/stats/$id'
+      fullPath: '/stats/$id/'
+      preLoaderRoute: typeof StatsIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/pulses/': {
       id: '/dashboard/pulses/'
       path: '/dashboard/pulses'
@@ -256,6 +289,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard/flairs'
       fullPath: '/dashboard/flairs/'
       preLoaderRoute: typeof DashboardFlairsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stats/$id/$pulseId': {
+      id: '/stats/$id/$pulseId'
+      path: '/stats/$id/$pulseId'
+      fullPath: '/stats/$id/$pulseId'
+      preLoaderRoute: typeof StatsIdPulseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/pulses/new': {
@@ -286,8 +326,10 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardFlairsIdRoute: DashboardFlairsIdRoute,
   DashboardPulsesNewRoute: DashboardPulsesNewRoute,
+  StatsIdPulseIdRoute: StatsIdPulseIdRoute,
   DashboardFlairsIndexRoute: DashboardFlairsIndexRoute,
   DashboardPulsesIndexRoute: DashboardPulsesIndexRoute,
+  StatsIdIndexRoute: StatsIdIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
