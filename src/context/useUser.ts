@@ -27,7 +27,7 @@ export function useUser() {
     queryKey: ["user"],
     queryFn: async () => {
       const res = await api.get<User>("/user/me");
-      console.log({ res });
+
       return res.data;
     },
   });
